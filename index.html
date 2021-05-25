@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Image Capture API demo</title>
+  <script type="module">
+    const photoOld = document.querySelector('#photo-old');
+    const photoNew = document.querySelector('#photo-new');
+    const preview = document.querySelector('#preview');
+    const takePhotoBtn = document.querySelector('#take-photo');
+    const startCameraBtn = document.querySelector('#start-camera');
+    const stopCameraBtn = document.querySelector('#stop-camera');
+    const cameras = [...document.querySelectorAll('[name="camera"]')];
+    const solutions = [...document.querySelectorAll('[name="solution"]')];
+    const light = document.querySelector('#light');
+
+    let track = null;
+
+    const selectCamera = async () => {
+      stopCamera();
+      const camera = cameras.find(el => el.checked).value;
+      const facingMode = camera === 'front'? 'user' : 'environment';
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode },
+      });
+      [track] = stream.getVideoTracks();
+      preview.srcObject = stream;
+      const capabilities = track.getCapabilities();
+      if (capabilities.torch) {
+        const torch = light.checked;
+        await track.applyConstraints({
+          advanced: [{ torch }]
+        })
+      }
+      preview.play();
+    };
+
+    const stopCamera = () => {
+      track?.stop();
+      track = null;
+    }
+
+    const drawPhoto = (blob, photo) => {
+      if (photo.src) {
+        URL.revokeObjectURL(photo.src);
+      }
+      photo.src = URL.createObjectURL(blob);
+    }
+
+    const takePhotoNew = async () => {
+      const imageCapture = new ImageCapture(track);
+      const blob = await imageCapture.takePhoto();
+      drawPhoto(blob, photoNew);
+    };
+
+    const takePhotoOld = () => {
+      const canvas = document.createElement('canvas');
+      const { width, height } = track.getSettings();
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      context.drawImage(preview, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => drawPhoto(blob, photoOld));
+    }
+
+    const takePhoto = async () => {
+      const solution = solutions.find(el => el.checked).value;
+      if (solution === 'new') {
+        await takePhotoNew();
+      }
+      else {
+        takePhotoOld();
+      }
+    }
+
+    cameras.forEach(el => el.addEventListener('change', selectCamera));
+
+    startCameraBtn.addEventListener('click', selectCamera);
+
+    light.addEventListener('change', selectCamera);
+
+    stopCameraBtn.addEventListener('click', stopCamera)
+
+    takePhotoBtn.addEventListener('click', takePhoto);
+  </script>
+</head>
+<body>
+<video id="preview"></video>
+<fieldset>
+  <legend>
+    Front or rear camera?
+  </legend>
+  <label>
+    Front camera
+    <input type="radio" name="camera" value="front" checked>
+  </label>
+  <label>
+    Back camera
+    <input type="radio" name="camera" value="back">
+  </label>
+</fieldset>
+<fieldset>
+  <legend>Turn on light?</legend>
+  <label>
+    Light
+    <input type="checkbox" id="light">
+  </label>
+</fieldset>
+<fieldset>
+  <legend>
+    New or old way?
+  </legend>
+  <label>
+    New
+    <input type="radio" name="solution" value="new" checked>
+  </label>
+  <label>
+    Old
+    <input type="radio" name="solution" value="old">
+  </label>
+</fieldset>
+<p>
+  <button id="start-camera">
+    Start camera
+  </button>
+  <button id="stop-camera">
+    Stop camera
+  </button>
+  <button id="take-photo">
+    Take photo
+  </button>
+</p>
+<p>
+  <h3>New</h3>
+  <img id="photo-new" src="" style="max-width: 100%">
+</p>
+<p>
+  <h3>Old</h3>
+  <img id="photo-old" src="" style="max-width: 100%">
+</p>
+</body>
+</html>
